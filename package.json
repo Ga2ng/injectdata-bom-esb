@@ -1,0 +1,15 @@
+{
+  "name": "esb-local-controller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local dashboard to connect, inspect, and monitor an ESB Chrome session via Playwright CDP",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "start:server": "npm --prefix server start",
+    "build:client": "npm --prefix client run build",
+    "dev": "node -e \"const {spawn}=require('child_process');const s=spawn('npm',['--prefix','server','run','dev'],{stdio:'inherit',shell:true});const c=spawn('npm',['--prefix','client','run','dev'],{stdio:'inherit',shell:true});const stop=()=>{s.kill();c.kill();process.exit(0);};process.on('SIGINT',stop);process.on('SIGTERM',stop);\""
+  }
+}
+
