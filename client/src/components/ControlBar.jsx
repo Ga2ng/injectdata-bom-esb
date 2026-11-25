@@ -186,7 +186,7 @@ export function ControlBar({
           menuList = data;
         } else if (data && Array.isArray(data.menus)) {
           menuList = data.menus;
-        } else if (data && data.menuName) {
+        } else if (data && (data.namaSystem || data.systemName || data.menuName)) {
           menuList = [data];
         }
 
@@ -359,8 +359,8 @@ export function ControlBar({
       return;
     }
 
-    if (!targetPayload.menuName && !targetPayload.namaSystem && !targetPayload.systemName && !Array.isArray(targetPayload) && !targetPayload.menus) {
-      setParseError('Data JSON harus memiliki menuName atau namaSystem / systemName!');
+    if (!targetPayload.namaSystem && !targetPayload.systemName && !targetPayload.menuName && !Array.isArray(targetPayload) && !targetPayload.menus) {
+      setParseError('Data JSON harus memiliki kolom namaSystem / systemName atau menuName!');
       return;
     }
 

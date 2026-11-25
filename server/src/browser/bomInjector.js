@@ -101,9 +101,10 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
   checkAbort(signal);
 
   const DRY_RUN = Boolean(options.dryRun || menuData.dryRun);
-  // Prioritaskan namaSystem / systemName sebagai acuan pencarian di sistem ESB!
-  const systemSearchName = menuData.namaSystem || menuData.systemName || menuData.menuName || 'Tanpa Nama';
-  const menuDisplayName = menuData.menuName || systemSearchName;
+  // Baca salah satu kolom: namaSystem atau systemName terlebih dahulu untuk mempercepat performa
+  const sourceColumn = menuData.namaSystem ? 'namaSystem' : menuData.systemName ? 'systemName' : 'menuName';
+  const systemSearchName = (menuData.namaSystem || menuData.systemName || menuData.menuName || 'Tanpa Nama').trim();
+  const menuDisplayName = (menuData.menuName || systemSearchName).trim();
   let ingredients = Array.isArray(menuData.ingredients) ? menuData.ingredients : [];
   const menuNo = menuData.menuNo || '';
 
@@ -119,7 +120,7 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
   const excludedMaterials = (getExcludedMaterialsList() || []).map((m) => m.toLowerCase().trim());
   const excludedSet = new Set(excludedMaterials);
 
-  log('INFO', 'inject_start', `[Menu #${menuNo}] "${systemSearchName}" (${ingredients.length} bahan di JSON). DRY_RUN: ${DRY_RUN}`);
+  log('INFO', 'inject_start', `[Menu #${menuNo}] "${systemSearchName}" (dibaca dari kolom: ${sourceColumn}, ${ingredients.length} bahan di JSON). DRY_RUN: ${DRY_RUN}`);
 
   // 1. Cek posisi: jika browser sudah di halaman edit BOM dan cocok untuk menu ini, langsung lanjutkan!
   const isAlreadyInTargetEditPage = await page.evaluate(({ sysName, dispName }) => {
@@ -145,45 +146,38 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
   } else {
     log('INFO', 'inject_nav', 'Navigasi ke https://erp.esb.co.id/bom...');
     await page.goto('https://erp.esb.co.id/bom', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await sleep(1200, signal);
+    await sleep(800, signal);
 
-    log('INFO', 'inject_search', `Mencari menu di sistem ESB dengan nama: "${systemSearchName}"...`);
+    // HAPUS tanda kurung () karena form pencarian BOM ESB tidak bisa membaca tanda kurung ()
+    const stripParentheses = (s) => (s ? String(s).replace(/[()]/g, '').trim() : '');
+    const cleanSearchQuery = stripParentheses(systemSearchName);
+
+    log('INFO', 'inject_search', `Mencari menu di filter ESB tanpa tanda kurung: "${cleanSearchQuery}" (Nama asli: "${systemSearchName}")...`);
     const searchInput = page.locator('input[name="MsBOMHeadForm[bomName]"]');
     await searchInput.waitFor({ state: 'visible', timeout: 15000 });
-    await searchInput.fill('');
-    await searchInput.type(systemSearchName, { delay: 20 });
+    // Gunakan fill langsung agar pencarian cepat tanpa delay ketik
+    await searchInput.fill(cleanSearchQuery);
     await page.keyboard.press('Enter');
 
-    await sleep(2500, signal);
     checkAbort(signal);
 
     const editBtn = page.locator('a:has(i.glyphicon-pencil), button:has(i.glyphicon-pencil)').first();
-    const hasEditBtn = await editBtn.isVisible().catch(() => false);
+    const hasEditBtn = await editBtn.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
 
-    // Fallback 1: Jika belum muncul dan ada kurung luar "(Menu ...)", coba cari tanpa kurung
+    // Fallback: Jika belum muncul, coba cari menggunakan nama resep (tanpa tanda kurung juga)
     if (!hasEditBtn) {
-      const cleaned = systemSearchName.replace(/^\(|\)$/g, '').trim();
-      if (cleaned && cleaned !== systemSearchName) {
-        log('INFO', 'inject_search_retry', `Hasil pencarian 0, mencoba tanpa kurung: "${cleaned}"...`);
-        await searchInput.fill('');
-        await searchInput.type(cleaned, { delay: 20 });
+      const cleanDisplayQuery = stripParentheses(menuDisplayName);
+      if (cleanDisplayQuery && cleanDisplayQuery.toLowerCase() !== cleanSearchQuery.toLowerCase()) {
+        log('INFO', 'inject_search_retry', `Hasil pencarian 0 untuk "${cleanSearchQuery}", mencoba nama menu resep: "${cleanDisplayQuery}"...`);
+        await searchInput.fill(cleanDisplayQuery);
         await page.keyboard.press('Enter');
-        await sleep(2500, signal);
+        await editBtn.waitFor({ state: 'visible', timeout: 8000 });
+      } else {
+        throw new Error(`Menu "${systemSearchName}" (pencarian: "${cleanSearchQuery}") tidak ditemukan pada daftar BOM ESB.`);
       }
     }
 
-    // Fallback 2: Jika masih belum ada, coba cari dengan menuDisplayName
-    const hasEditBtn2 = await editBtn.isVisible().catch(() => false);
-    if (!hasEditBtn2 && menuDisplayName && menuDisplayName !== systemSearchName) {
-      log('INFO', 'inject_search_retry', `Hasil pencarian 0, mencoba dengan menuName: "${menuDisplayName}"...`);
-      await searchInput.fill('');
-      await searchInput.type(menuDisplayName, { delay: 20 });
-      await page.keyboard.press('Enter');
-      await sleep(2500, signal);
-    }
-
-    await editBtn.waitFor({ state: 'visible', timeout: 15000 });
-    log('INFO', 'inject_edit', `Klik tombol Edit menu "${systemSearchName}"...`);
+    log('INFO', 'inject_edit', `Klik tombol Edit menu "${cleanSearchQuery}"...`);
     await editBtn.click();
   }
 
@@ -432,9 +426,11 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
         await sleep(1000, signal);
       }
     } catch (err) {
-      log('ERROR', 'inject_error', `[ERROR] Gagal memproses bahan "${ingName}": ${err.message}`);
+      log('ERROR', 'inject_error', `[GAGAL BAHAN] Gagal memproses bahan "${ingName}": ${err.message}`);
       report.failedIngredients.push({
         bahan: ingName,
+        gramasi: ingQty,
+        satuan: ingUnit,
         error: err.message,
       });
 
@@ -463,7 +459,7 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
   log(
     'SUCCESS',
     'inject_finish',
-    `[SELESAI] Menu "${menuName}" berhasil di-save ke ESB! (+${report.addedIngredients.length} bahan baru dimasukkan, ${report.skippedIngredients.length} sudah ada, ${report.excludedIngredients.length} di-exclude).`
+    `[SELESAI] Menu "${systemSearchName}" berhasil di-save ke ESB! (+${report.addedIngredients.length} bahan baru dimasukkan, ${report.skippedIngredients.length} sudah ada, ${report.excludedIngredients.length} di-exclude, ${report.failedIngredients.length} gagal).`
   );
 
   return report;

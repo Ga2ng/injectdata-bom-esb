@@ -310,7 +310,8 @@ export function bulkSaveTargetMenus(menuList, replace = false) {
     }
     for (let m of items) {
       m = cleanMenuData(m);
-      const title = m.menuName || m.namaSystem || m.systemName || 'Tanpa Nama';
+      // Baca salah satu kolom: namaSystem atau systemName terlebih dahulu
+      const title = (m.namaSystem || m.systemName || m.menuName || 'Tanpa Nama').trim();
       const menuKey = String(
         m.menuKey ||
         (m.menuNo ? `no_${m.menuNo}` : (m.namaSystem || m.systemName || m.menuName) ? (m.namaSystem || m.systemName || m.menuName).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() : Math.random().toString(36).slice(2, 9))
@@ -333,7 +334,8 @@ export function bulkSaveTargetMenus(menuList, replace = false) {
 
 export function saveOneTargetMenu(menu) {
   menu = cleanMenuData(menu);
-  const title = menu.menuName || menu.namaSystem || menu.systemName || 'Tanpa Nama';
+  // Baca salah satu kolom: namaSystem atau systemName terlebih dahulu
+  const title = (menu.namaSystem || menu.systemName || menu.menuName || 'Tanpa Nama').trim();
   const menuKey = String(
     menu.menuKey ||
     (menu.menuNo ? `no_${menu.menuNo}` : (menu.namaSystem || menu.systemName || menu.menuName) ? (menu.namaSystem || menu.systemName || menu.menuName).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() : Date.now())

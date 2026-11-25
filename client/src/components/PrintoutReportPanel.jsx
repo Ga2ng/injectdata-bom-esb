@@ -1,3 +1,5 @@
+import { exportReportToCsv, exportReportToExcel } from '../utils/excelExporter.js';
+
 export function PrintoutReportPanel({ report }) {
   if (!report || !report.results || report.results.length === 0) {
     return null;
@@ -128,14 +130,35 @@ export function PrintoutReportPanel({ report }) {
             Waktu: {new Date(report.executedAt).toLocaleString('id-ID')} | Total Menu: {report.totalMenus}
           </span>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ padding: '6px 14px', fontSize: '13px', fontWeight: 'bold' }}
-          onClick={handlePrintPdfResultOnly}
-        >
-          📄 Download PDF (Hanya Result Saja)
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-success"
+            style={{ padding: '6px 14px', fontSize: '13px', fontWeight: 'bold', background: '#16a34a', color: '#fff', border: 'none' }}
+            onClick={() => exportReportToExcel(report)}
+            title="Download hasil injeksi ke format Excel (.xls multi-sheet lengkap dengan format dan warna)"
+          >
+            📊 Download Excel (.xls)
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ padding: '6px 14px', fontSize: '13px', fontWeight: 'bold' }}
+            onClick={handlePrintPdfResultOnly}
+            title="Cetak atau simpan hasil injeksi ke PDF"
+          >
+            📄 Download PDF
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ padding: '6px 12px', fontSize: '13px', background: '#fff' }}
+            onClick={() => exportReportToCsv(report)}
+            title="Download data bahan mentah ke CSV"
+          >
+            📑 CSV
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { exportHistoryToExcel } from '../utils/excelExporter.js';
 
 function formatDateTime(isoString) {
   if (!isoString) return '-';
@@ -31,7 +32,7 @@ export function HistoryPanel({ historyList = [], onRefresh }) {
             Rekap hasil rapi eksekusi menu: daftar menu yang berhasil, bahan yang ditambahkan, dan menu yang gagal
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -41,6 +42,17 @@ export function HistoryPanel({ historyList = [], onRefresh }) {
             <option value="Success">Hanya Berhasil</option>
             <option value="Failed">Hanya Gagal</option>
           </select>
+          {historyList.length > 0 && (
+            <button
+              type="button"
+              className="btn"
+              style={{ padding: '4px 10px', fontSize: '12px', background: '#f0fdf4', color: '#15803d', borderColor: '#86efac', fontWeight: 'bold' }}
+              onClick={() => exportHistoryToExcel(filteredHistory)}
+              title="Download riwayat injeksi ini ke file Excel (.xls)"
+            >
+              📊 Export ke Excel
+            </button>
+          )}
           {onRefresh && (
             <button
               type="button"

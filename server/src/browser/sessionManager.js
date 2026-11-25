@@ -546,8 +546,9 @@ export async function startBomInjection(inputData) {
         }
 
         const menu = menuList[i];
-        const menuTitle = menu.namaSystem || menu.systemName || menu.menuName;
-        log('INFO', 'inject_menu_step', `[${i + 1}/${menuList.length}] Memproses menu: "${menuTitle}"`);
+        const sourceCol = menu.namaSystem ? 'namaSystem' : menu.systemName ? 'systemName' : 'menuName';
+        const menuTitle = (menu.namaSystem || menu.systemName || menu.menuName || 'Tanpa Nama').trim();
+        log('INFO', 'inject_menu_step', `[${i + 1}/${menuList.length}] Memproses menu: "${menuTitle}" (dibaca dari kolom: ${sourceCol})`);
 
         try {
           const report = await injectBomMenu(targetPage, menu, controller.signal);
@@ -591,7 +592,7 @@ export async function startBomInjection(inputData) {
             addedIngredients: [],
             skippedIngredients: [],
             excludedIngredients: [],
-            failedIngredients: [{ error: itemErr.message }],
+            failedIngredients: [{ bahan: menuTitle, error: itemErr.message }],
           };
           executionResults.push(failReport);
           recordInjectionHistory({
