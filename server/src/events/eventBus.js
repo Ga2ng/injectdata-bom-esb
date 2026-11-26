@@ -1,6 +1,6 @@
 import { insertLog } from '../database/db.js';
 
-const VALID_LEVELS = new Set(['INFO', 'SUCCESS', 'WARNING', 'ERROR']);
+const VALID_LEVELS = new Set(['INFO', 'SUCCESS', 'WARNING', 'ERROR', 'WARN']);
 const clients = new Set();
 
 function writeSseMessage(res, data) {
@@ -34,12 +34,10 @@ export function sendToClient(res, type, payload) {
  * Persist an activity log entry to SQLite and broadcast it to connected SSE clients.
  */
 export function log(level, event, message) {
-  if (!VALID_LEVELS.has(level)) {
-    throw new Error(`Invalid log level: ${level}`);
-  }
+  const safeLevel = level === 'WARN' ? 'WARNING' : VALID_LEVELS.has(level) ? level : 'INFO';
   const entry = insertLog({
     createdAt: new Date().toISOString(),
-    level,
+    level: safeLevel,
     event,
     message,
   });

@@ -285,13 +285,15 @@ export function ControlBar({
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm('Yakin ingin mengosongkan seluruh antrean menu di database?')) return;
+    if (!window.confirm('Yakin ingin mengosongkan seluruh antrean menu di database dan me-reset browser?')) return;
     try {
       const res = await clearTargetMenusAll();
       setTargetMenus(res.menus || []);
       setSelectedBatchKeys(new Set());
       setSelectedKey(null);
       setJsonInput('');
+      setParseError(null);
+      alert('Database antrean dan status browser berhasil dikosongkan & di-reset bersih!');
     } catch (err) {
       alert(`Gagal: ${err.message}`);
     }

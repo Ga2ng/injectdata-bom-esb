@@ -131,14 +131,13 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
     );
     if (!hasEditElements) return false;
 
-    // Periksa apakah halaman edit ini memang untuk target menu ini
+    // Periksa apakah halaman edit ini memang untuk target menu ini (case-sensitive sesuai sistem)
     const headInput = document.querySelector('input[name*="bomName"], #msbomhead-bomname, input#bomName');
     if (headInput && headInput.value) {
-      const val = headInput.value.trim().toLowerCase();
-      return val === sysName.toLowerCase() || val === dispName.toLowerCase();
+      const val = headInput.value.trim();
+      return val === sysName.trim() || val === dispName.trim();
     }
-    const bodyText = document.body ? document.body.innerText.toLowerCase() : '';
-    return bodyText.includes(sysName.toLowerCase()) || bodyText.includes(dispName.toLowerCase());
+    return false; // Jangan gunakan bodyText.includes agar tidak salah mendeteksi menu lain
   }, { sysName: systemSearchName, dispName: menuDisplayName });
 
   if (isAlreadyInTargetEditPage) {
@@ -146,7 +145,7 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
   } else {
     log('INFO', 'inject_nav', 'Navigasi ke https://erp.esb.co.id/bom...');
     await page.goto('https://erp.esb.co.id/bom', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await sleep(800, signal);
+    await sleep(1500, signal);
 
     // HAPUS tanda kurung () karena form pencarian BOM ESB tidak bisa membaca tanda kurung ()
     const stripParentheses = (s) => (s ? String(s).replace(/[()]/g, '').trim() : '');
@@ -155,28 +154,39 @@ export async function injectBomMenu(page, menuData, signal, options = {}) {
     log('INFO', 'inject_search', `Mencari menu di filter ESB tanpa tanda kurung: "${cleanSearchQuery}" (Nama asli: "${systemSearchName}")...`);
     const searchInput = page.locator('input[name="MsBOMHeadForm[bomName]"]');
     await searchInput.waitFor({ state: 'visible', timeout: 15000 });
-    // Gunakan fill langsung agar pencarian cepat tanpa delay ketik
+    await searchInput.click();
+    await searchInput.fill('');
     await searchInput.fill(cleanSearchQuery);
     await page.keyboard.press('Enter');
 
+    // Berikan jeda waktu agar tabel ESB selesai memuat hasil filter AJAX (mencegah klik salah menu)
+    await sleep(2500, signal);
     checkAbort(signal);
 
     const editBtn = page.locator('a:has(i.glyphicon-pencil), button:has(i.glyphicon-pencil)').first();
-    const hasEditBtn = await editBtn.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    const hasEditBtn = await editBtn.isVisible().catch(() => false);
 
     // Fallback: Jika belum muncul, coba cari menggunakan nama resep (tanpa tanda kurung juga)
     if (!hasEditBtn) {
       const cleanDisplayQuery = stripParentheses(menuDisplayName);
-      if (cleanDisplayQuery && cleanDisplayQuery.toLowerCase() !== cleanSearchQuery.toLowerCase()) {
-        log('INFO', 'inject_search_retry', `Hasil pencarian 0 untuk "${cleanSearchQuery}", mencoba nama menu resep: "${cleanDisplayQuery}"...`);
+      if (cleanDisplayQuery && cleanDisplayQuery !== cleanSearchQuery) {
+        log('INFO', 'inject_search_retry', `Hasil pencarian 0, mencoba dengan nama menu resep: "${cleanDisplayQuery}"...`);
+        await searchInput.click();
+        await searchInput.fill('');
         await searchInput.fill(cleanDisplayQuery);
         await page.keyboard.press('Enter');
-        await editBtn.waitFor({ state: 'visible', timeout: 8000 });
-      } else {
-        throw new Error(`Menu "${systemSearchName}" (pencarian: "${cleanSearchQuery}") tidak ditemukan pada daftar BOM ESB.`);
+        await sleep(2500, signal);
       }
     }
 
+    // Pastikan baris tabel tidak berupa "No results found"
+    const targetRow = page.locator('.grid-view table tbody tr, table tbody tr').first();
+    const rowText = await targetRow.innerText().catch(() => '');
+    if (rowText.toLowerCase().includes('no results') || rowText.toLowerCase().includes('tidak ada data') || rowText.toLowerCase().includes('tidak ditemukan')) {
+      throw new Error(`Menu "${systemSearchName}" tidak ditemukan di daftar BOM ESB (Hasil pencarian untuk "${cleanSearchQuery}" kosong).`);
+    }
+
+    await editBtn.waitFor({ state: 'visible', timeout: 15000 });
     log('INFO', 'inject_edit', `Klik tombol Edit menu "${cleanSearchQuery}"...`);
     await editBtn.click();
   }

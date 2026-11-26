@@ -239,12 +239,23 @@ browserRouter.delete('/target-menus/item/:menuKey', (req, res) => {
   }
 });
 
-// Kosongkan semua antrean menu
-browserRouter.delete('/target-menus/clear', (req, res) => {
+// Kosongkan semua antrean menu dan reset sesi/browser bersih
+browserRouter.delete('/target-menus/clear', async (req, res) => {
   try {
     const updated = clearTargetMenus();
-    log('WARNING', 'target_menus_cleared', 'Semua antrean menu di database dibersihkan.');
+    await sessionManager.resetSessionAndBrowser().catch(() => null);
+    log('WARNING', 'target_menus_cleared', 'Semua antrean menu di database dibersihkan dan status sesi/browser di-reset bersih.');
     res.json({ ok: true, menus: updated });
+  } catch (err) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// Reset manual sesi & browser
+browserRouter.post('/session/reset', async (req, res) => {
+  try {
+    const status = await sessionManager.resetSessionAndBrowser();
+    res.json({ ok: true, status });
   } catch (err) {
     res.status(500).json({ ok: false, message: err.message });
   }

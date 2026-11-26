@@ -671,6 +671,58 @@ export function stopDemo() {
   return getStatus();
 }
 
+/**
+ * Reset penuh status sesi, hentikan task berjalan, bersihkan cache, dan kembalikan browser ke halaman BOM bersih
+ */
+export async function resetSessionAndBrowser() {
+  if (activeAbortController && !activeAbortController.signal.aborted) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+  state.taskStatus = 'Idle';
+  state.currentExecutionReport = null;
+  state.lastActivityAt = new Date().toISOString();
+  emitStatus();
+
+  if (targetPage && !targetPage.isClosed()) {
+    try {
+      // Tutup semua modal popup jika ada yang masih terbuka
+      await targetPage.evaluate(() => {
+        const modals = document.querySelectorAll('.modal.in, .modal.show, #ModalDialog, .modal');
+        modals.forEach((m) => {
+          try {
+            if (window.$) $(m).modal('hide');
+            m.classList.remove('in', 'show');
+            m.style.display = 'none';
+          } catch {}
+        });
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach((b) => b.remove());
+        document.body.classList.remove('modal-open');
+      }).catch(() => null);
+
+      // Jika sedang berada di ERP ESB, kembalikan halaman ke daftar BOM bersih
+      if (targetPage.url().includes('erp.esb.co.id')) {
+        await targetPage.goto('https://erp.esb.co.id/bom', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null);
+        // Kosongkan input filter pencarian jika ada sisa teks lama
+        await targetPage.evaluate(() => {
+          const input = document.querySelector('input[name="MsBOMHeadForm[bomName]"]');
+          if (input && input.value) {
+            input.value = '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }).catch(() => null);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  log('INFO', 'session_reset', 'Semua state antrean & browser berhasil di-reset bersih (fresh).');
+  return getStatus();
+}
+
 export async function shutdown() {
   await disconnect();
 }
